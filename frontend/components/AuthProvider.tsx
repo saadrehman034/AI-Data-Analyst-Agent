@@ -27,7 +27,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (): Promise<void> => {
     const me = await fetchMe();
     setUser(me);
   }, []);
