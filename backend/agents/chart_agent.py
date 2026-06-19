@@ -18,7 +18,7 @@ NUMERIC_TYPES = {"integer", "numeric", "real", "double", "bigint", "smallint", "
 def _get_model() -> genai.GenerativeModel:
     global _model
     if _model is None:
-        genai.configure(api_key=settings.gemini_api_key)
+        genai.configure(api_key=settings.gemini_api_key, transport="rest")
         _model = genai.GenerativeModel(
             settings.gemini_model,
             generation_config=genai.types.GenerationConfig(
