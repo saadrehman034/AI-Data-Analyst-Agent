@@ -76,16 +76,17 @@ async def _any_connection(analyst_dsn: Optional[str]):
 
 
 async def _fetch_schema_from_conn(conn) -> dict[str, TableInfo]:
+    # Include public schema + business_data schema (used by seed script)
     column_rows = await conn.fetch("""
-        SELECT c.table_name, c.column_name, c.data_type, c.is_nullable, c.column_default
+        SELECT c.table_schema, c.table_name, c.column_name, c.data_type, c.is_nullable, c.column_default
         FROM information_schema.columns c
         JOIN information_schema.tables t
             ON c.table_name = t.table_name AND c.table_schema = t.table_schema
-        WHERE c.table_schema = 'public' AND t.table_type = 'BASE TABLE'
-        ORDER BY c.table_name, c.ordinal_position
+        WHERE c.table_schema IN ('public', 'business_data') AND t.table_type = 'BASE TABLE'
+        ORDER BY c.table_schema, c.table_name, c.ordinal_position
     """)
     fk_rows = await conn.fetch("""
-        SELECT kcu.table_name, kcu.column_name,
+        SELECT kcu.table_schema, kcu.table_name, kcu.column_name,
                ccu.table_name AS references_table,
                ccu.column_name AS references_column
         FROM information_schema.table_constraints AS tc
@@ -93,20 +94,27 @@ async def _fetch_schema_from_conn(conn) -> dict[str, TableInfo]:
             ON tc.constraint_name = kcu.constraint_name AND tc.table_schema = kcu.table_schema
         JOIN information_schema.constraint_column_usage AS ccu
             ON ccu.constraint_name = tc.constraint_name AND ccu.table_schema = tc.table_schema
-        WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_schema = 'public'
+        WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_schema IN ('public', 'business_data')
     """)
     table_rows = await conn.fetch("""
-        SELECT table_name FROM information_schema.tables
-        WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
-        ORDER BY table_name
+        SELECT table_schema, table_name FROM information_schema.tables
+        WHERE table_schema IN ('public', 'business_data') AND table_type = 'BASE TABLE'
+        ORDER BY table_schema, table_name
     """)
 
-    tables: dict[str, TableInfo] = {r["table_name"]: TableInfo(name=r["table_name"]) for r in table_rows}
+    # Key: "schema.table" for business_data, just "table" for public
+    def table_key(schema: str, name: str) -> str:
+        return f"{schema}.{name}" if schema != "public" else name
+
+    tables: dict[str, TableInfo] = {
+        table_key(r["table_schema"], r["table_name"]): TableInfo(name=table_key(r["table_schema"], r["table_name"]))
+        for r in table_rows
+    }
 
     for row in column_rows:
-        tname = row["table_name"]
-        if tname in tables:
-            tables[tname].columns.append(ColumnInfo(
+        key = table_key(row["table_schema"], row["table_name"])
+        if key in tables:
+            tables[key].columns.append(ColumnInfo(
                 name=row["column_name"],
                 data_type=row["data_type"],
                 is_nullable=row["is_nullable"] == "YES",
@@ -114,19 +122,23 @@ async def _fetch_schema_from_conn(conn) -> dict[str, TableInfo]:
             ))
 
     for row in fk_rows:
-        tname = row["table_name"]
-        if tname in tables:
-            tables[tname].foreign_keys.append(ForeignKeyInfo(
+        key = table_key(row["table_schema"], row["table_name"])
+        if key in tables:
+            tables[key].foreign_keys.append(ForeignKeyInfo(
                 column=row["column_name"],
                 references_table=row["references_table"],
                 references_column=row["references_column"],
             ))
 
-    for tname in tables:
+    for key in tables:
         try:
-            tables[tname].row_count = await conn.fetchval(f'SELECT COUNT(*) FROM "{tname}"')
-        except Exception as e:
-            logger.warning(f"Could not get row count for {tname}: {e}")
+            tables[key].row_count = await conn.fetchval(f'SELECT COUNT(*) FROM "{key}"')
+        except Exception:
+            try:
+                # Try schema-qualified name
+                tables[key].row_count = await conn.fetchval(f'SELECT COUNT(*) FROM {key}')
+            except Exception as e:
+                logger.warning(f"Could not get row count for {key}: {e}")
 
     return tables
 
