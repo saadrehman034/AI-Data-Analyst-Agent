@@ -8,6 +8,12 @@ class Settings(BaseSettings):
     gemini_api_key: str
     gemini_model: str = "gemini-2.0-flash"
 
+    def model_post_init(self, __context):
+        # Strip whitespace/newlines from keys that are used in HTTP headers
+        object.__setattr__(self, "gemini_api_key", self.gemini_api_key.strip())
+        object.__setattr__(self, "secret_key", self.secret_key.strip())
+        object.__setattr__(self, "fernet_key", self.fernet_key.strip())
+
     # ── Databases ─────────────────────────────────────────────────────────────
     database_url: str = "postgresql://postgres@localhost:5432/querymind"
     analyst_db_url: str = "postgresql://postgres@localhost:5432/business_data"
