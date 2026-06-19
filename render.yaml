@@ -1,0 +1,34 @@
+services:
+  - type: web
+    name: querymind-backend
+    runtime: python
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: python -m uvicorn backend.main:app --host 0.0.0.0 --port $PORT
+    plan: free
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-3.1-flash-lite
+      - key: SECRET_KEY
+        sync: false
+      - key: FERNET_KEY
+        sync: false
+      - key: DATABASE_URL
+        fromDatabase:
+          name: querymind-db
+          property: connectionString
+      - key: ANALYST_DB_URL
+        fromDatabase:
+          name: querymind-db
+          property: connectionString
+      - key: ENVIRONMENT
+        value: production
+      - key: PYTHONUNBUFFERED
+        value: "1"
+
+databases:
+  - name: querymind-db
+    plan: free
+    databaseName: querymind
+    user: querymind_admin
