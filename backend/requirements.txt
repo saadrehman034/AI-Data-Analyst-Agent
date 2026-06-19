@@ -1,0 +1,32 @@
+# Web framework
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+
+# Database
+asyncpg==0.30.0
+
+# Config & validation
+pydantic==2.10.3
+pydantic-settings==2.6.1
+python-dotenv==1.0.1
+
+# LLM
+google-generativeai==0.8.3
+
+# AI pipeline
+langgraph>=1.1.1
+langchain-core>=1.2.10
+
+# Auth
+python-jose[cryptography]==3.3.0
+bcrypt==4.2.1
+python-multipart==0.0.12
+
+# Encryption for stored connection strings
+cryptography==43.0.0
+
+# Rate limiting
+slowapi==0.1.9
+
+# Fake data seeding
+faker==33.1.0
