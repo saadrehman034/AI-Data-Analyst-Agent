@@ -30,7 +30,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const refresh = useCallback(async () => {
     const me = await fetchMe();
     setUser(me);
-    return me;
   }, []);
 
   useEffect(() => {
